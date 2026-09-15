@@ -23,7 +23,7 @@ namespace ShipIt.Controllers
         }
 
         [HttpPost("")]
-        public void Post([FromBody] OutboundOrderRequestModel request)
+        public OutboundOrderResponse Post([FromBody] OutboundOrderRequestModel request)
         {
             Log.Info(String.Format("Processing outbound order: {0}", request));
 
@@ -38,23 +38,31 @@ namespace ShipIt.Controllers
             }
 
             var productDataModels = _productRepository.GetProductsByGtin(gtins);
+            // Creates a dictionary mapping gtin to Product. Product contains all opf the info about a product, including the Weight field needed for task 2.
             var products = productDataModels.ToDictionary(p => p.Gtin, p => new Product(p));
 
             var lineItems = new List<StockAlteration>();
             var productIds = new List<int>();
             var errors = new List<string>();
 
+            double totalWeightKg = 0; // Initialize total weight variable
+
+            // Loops through each order
             foreach (var orderLine in request.OrderLines)
             {
                 if (!products.ContainsKey(orderLine.gtin))
                 {
                     errors.Add(string.Format("Unknown product gtin: {0}", orderLine.gtin));
                 }
+                // If order exists, add the product id and quantity to the list of line items to be processed for stock removal
                 else
                 {
+                    // This is where the order is added the list of Line Items to be procxessed for stock removal. The product is looked up by gtin and the product id is added to the list of product ids to be used in the stock lookup.
                     var product = products[orderLine.gtin];
+                    // Add product weight into the StockAlteration object to be used in the truck estimation calculation
                     lineItems.Add(new StockAlteration(product.Id, orderLine.quantity));
                     productIds.Add(product.Id);
+                    totalWeightKg += (product.Weight / 1000.0) * orderLine.quantity;
                 }
             }
 
@@ -86,7 +94,10 @@ namespace ShipIt.Controllers
                         string.Format("Product: {0}, stock held: {1}, stock to remove: {2}", orderLine.gtin, item.held,
                             lineItem.Quantity));
                 }
+
             }
+
+            int estimatedTrucks = (int)Math.Ceiling(totalWeightKg / 2000);
 
             if (errors.Count > 0)
             {
@@ -94,6 +105,12 @@ namespace ShipIt.Controllers
             }
 
             _stockRepository.RemoveStock(request.WarehouseId, lineItems);
+
+
+            return new OutboundOrderResponse()
+            {
+                EstimatedTrucksPerOrder = estimatedTrucks
+            };
         }
     }
 }
