@@ -23,3 +23,7 @@ To run the tests you should be able to run dotnet test in the ShipItTests direct
 
 ## Deploying to Production
 TODO
+
+
+## My notes
+- Changed version of .NET being used in `ShipItTest.csproj` and `ShipIt.csproj` from 3.1 (very old) to 10

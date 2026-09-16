@@ -198,5 +198,40 @@ namespace ShipItTest
                 Assert.IsTrue(e.Message.Contains(GTIN));
             }
         }
+
+        [Test]
+        public void TestOutboundOrderTruckEstimation()
+        {
+        // Runs shared setup
+        onSetUp();
+
+        var truckTestGtin = GTIN + "TRUCK";
+        // Create a new product with a specific weight for testing truck estimation
+        var truckProductDataModel = new ProductBuilder()
+            .setGtin(truckTestGtin)
+            .setWeight(1000f) 
+            .CreateProductDatabaseModel();
+            
+        productRepository.AddProducts(new List<ProductDataModel>() { truckProductDataModel });
+        var truckProductId = new Product(productRepository.GetProductByGtin(truckTestGtin)).Id;
+
+        stockRepository.AddStock(WAREHOUSE_ID, new List<StockAlteration>() { new StockAlteration(truckProductId, 2000) });
+
+        var outboundOrder = new OutboundOrderRequestModel()
+        {
+            WarehouseId = WAREHOUSE_ID,
+            OrderLines = new List<OrderLine>()
+            {
+                new OrderLine()
+                {
+                    gtin = truckTestGtin,
+                    quantity = 2000
+                }
+            }
+        };
+
+        var response = outboundOrderController.Post(outboundOrder);
+        Assert.AreEqual(1, response.EstimatedTrucksPerOrder);
+        }
     }
 }
